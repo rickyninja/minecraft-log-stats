@@ -5,9 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/textproto"
-	"os"
 	"testing"
 	"time"
 )
@@ -326,16 +324,4 @@ func TestLogLine_GetDeath(t *testing.T) {
 			t.Errorf("case name: [%s] wrong killer got %s want %s", tc.name, got.Killer, want.Killer)
 		}
 	}
-}
-
-func getFileBytes(t *testing.T, filename string) []byte {
-	fd, err := os.Open(filename)
-	if err != nil {
-		t.Fatalf("Failed to open %s: %s", filename, err)
-	}
-	b, err := ioutil.ReadAll(fd)
-	if err != nil {
-		t.Fatalf("Failed ReadAll: %s", err)
-	}
-	return b
 }
