@@ -1,9 +1,11 @@
 package minelog
 
 import (
-	"encoding/json"
+	"bufio"
+	"compress/gzip"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,41 +20,22 @@ const (
 )
 
 type LogLine struct {
-	Time  time.Time
-	Level LogLevel
-	Line  string
-	// Players is the list of players in the whitelist.  This is a convenience to get a list of valid
-	// players.  TODO It may make more since to parse player join messages to get this info.
-	Players Players
+	Time      time.Time
+	Level     LogLevel
+	Line      string
+	whitelist *Whitelist
 }
 
-func NewLogLine(filename string, players Players) (*LogLine, error) {
+func NewLogLine(filename string, wl *Whitelist) (*LogLine, error) {
 	ts, err := getTimeFromFilename(filename)
 	if err != nil {
 		return nil, err
 	}
 	l := &LogLine{
-		Time:    ts,
-		Players: players,
+		Time:      ts,
+		whitelist: wl,
 	}
 	return l, nil
-}
-
-func GetPlayers(filename string) (Players, error) {
-	var p Players
-	fd, err := os.Open(filename)
-	if err != nil {
-		return p, err
-	}
-	data, err := ioutil.ReadAll(fd)
-	if err != nil {
-		return p, err
-	}
-	err = json.Unmarshal(data, &p)
-	if err != nil {
-		return p, err
-	}
-	return p, nil
 }
 
 func getTimeFromFilename(filename string) (time.Time, error) {
@@ -73,15 +56,6 @@ func getTimeFromFilename(filename string) (time.Time, error) {
 func getPlayerFromLine(line string) string {
 	toks := strings.Fields(line)
 	return toks[0]
-}
-
-func (l LogLine) PlayerInWhiteList(player string) bool {
-	for _, p := range l.Players {
-		if p.Name == player {
-			return true
-		}
-	}
-	return false
 }
 
 type DeathType int
@@ -171,7 +145,7 @@ func (d Death) String() string {
 func (l *LogLine) GetDeath() Death {
 	toks := strings.Fields(l.Line)
 	d := Death{LogLine: *l}
-	if !l.PlayerInWhiteList(toks[0]) {
+	if !l.whitelist.ContainsPlayer(toks[0]) {
 		d.Type = DeathNone
 		return d
 	}
@@ -286,4 +260,33 @@ func (l *LogLine) Parse(line string) error {
 	l.Line = parts[1]
 	l.Time = time.Date(l.Time.Year(), l.Time.Month(), l.Time.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.UTC)
 	return nil
+}
+
+func KnownEvent(line string) bool {
+	known := []string{"joined", "left", "lost connection", "moved too quickly!",
+		"has made the advancement", "completed the challenge", "moved wrongly"}
+	for _, k := range known {
+		if strings.Contains(line, k) {
+			return true
+		}
+	}
+	return false
+}
+
+func GetTextReader(filename string) (*textproto.Reader, error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	var r io.Reader
+	r = fd
+	if strings.HasSuffix(filename, ".gz") {
+		gr, err := gzip.NewReader(fd)
+		if err != nil {
+			return nil, err
+		}
+		r = gr
+	}
+	tr := textproto.NewReader(bufio.NewReader(r))
+	return tr, nil
 }

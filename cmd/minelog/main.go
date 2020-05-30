@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bufio"
-	"compress/gzip"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"net/textproto"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,13 +15,13 @@ import (
 )
 
 var (
-	logdir    string
-	whitelist string
+	logdir        string
+	whitelistFile string
 )
 
 func init() {
 	flag.StringVar(&logdir, "logdir", "", "the directory with log files")
-	flag.StringVar(&whitelist, "whitelist", "", "the whitelist.json file")
+	flag.StringVar(&whitelistFile, "whitelist", "", "the whitelist.json file")
 }
 
 func main() {
@@ -33,11 +30,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	players, err := minelog.GetPlayers(whitelist)
-	if err != nil {
-		log.Fatal(err)
-	}
-	deaths, err := processLogDir(logdir, players)
+	whitelist, err := minelog.LoadWhitelistFile(whitelistFile)
+	deaths, err := processLogDir(logdir, whitelist)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -109,7 +103,7 @@ func mostDeaths(m map[string]int) string {
 	return victim
 }
 
-func processLogDir(logdir string, players minelog.Players) ([]minelog.Death, error) {
+func processLogDir(logdir string, whitelist *minelog.Whitelist) ([]minelog.Death, error) {
 	deaths := make([]minelog.Death, 0)
 	files, err := ioutil.ReadDir(logdir)
 	if err != nil {
@@ -120,7 +114,7 @@ func processLogDir(logdir string, players minelog.Players) ([]minelog.Death, err
 			continue
 		}
 		filename := filepath.Join(logdir, fi.Name())
-		tr, err := GetTextReader(filename)
+		tr, err := minelog.GetTextReader(filename)
 		if err != nil {
 			return deaths, err
 		}
@@ -132,7 +126,7 @@ func processLogDir(logdir string, players minelog.Players) ([]minelog.Death, err
 				}
 				return deaths, err
 			}
-			ll, err := minelog.NewLogLine(filename, players)
+			ll, err := minelog.NewLogLine(filename, whitelist)
 			if err != nil {
 				return deaths, err
 			}
@@ -144,7 +138,7 @@ func processLogDir(logdir string, players minelog.Players) ([]minelog.Death, err
 			//fmt.Println(ll.Line)
 			toks := strings.Fields(ll.Line)
 			//fmt.Printf("isplayer %s: %t\n", toks[0], ll.IsPlayer(toks[0]))
-			if death.Type == minelog.DeathNone && ll.PlayerInWhiteList(toks[0]) && !KnownEvent(line) {
+			if death.Type == minelog.DeathNone && whitelist.ContainsPlayer(toks[0]) && !minelog.KnownEvent(line) {
 				log.Printf("unrecognized death: %s", ll.Line)
 			}
 			if death.Type == minelog.DeathNone {
@@ -154,37 +148,6 @@ func processLogDir(logdir string, players minelog.Players) ([]minelog.Death, err
 		}
 	}
 	return deaths, nil
-}
-
-// TODO probably belongs in lib
-func KnownEvent(line string) bool {
-	known := []string{"joined", "left", "lost connection", "moved too quickly!",
-		"has made the advancement", "completed the challenge", "moved wrongly"}
-	for _, k := range known {
-		if strings.Contains(line, k) {
-			return true
-		}
-	}
-	return false
-}
-
-// TODO probably belongs in lib
-func GetTextReader(filename string) (*textproto.Reader, error) {
-	fd, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	var r io.Reader
-	r = fd
-	if strings.HasSuffix(filename, ".gz") {
-		gr, err := gzip.NewReader(fd)
-		if err != nil {
-			return nil, err
-		}
-		r = gr
-	}
-	tr := textproto.NewReader(bufio.NewReader(r))
-	return tr, nil
 }
 
 func validateFlags() error {

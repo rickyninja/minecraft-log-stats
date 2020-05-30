@@ -60,14 +60,6 @@ func TestWhitelist(t *testing.T) {
 	}
 }
 
-func getPlayers(t *testing.T, whitelist string) Players {
-	p, err := GetPlayers(whitelist)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return p
-}
-
 func TestGetTimeFromFilename(t *testing.T) {
 	now := time.Now().In(time.UTC)
 	cases := []struct {
@@ -169,9 +161,11 @@ func TestLogLine_Parse(t *testing.T) {
 [23:20:01] [Server thread/INFO]: ricky_ninja joined the game
 [23:30:58] [Server thread/INFO]: ricky_ninja lost connection: Disconnected
 [23:30:58] [Server thread/INFO]: ricky_ninja left the game`)
-	players := Players{
-		Player{Name: "ricky_ninja"},
-		Player{Name: "Sanrei_"},
+	whitelist := &Whitelist{
+		Players: Players{
+			Player{Name: "ricky_ninja"},
+			Player{Name: "Sanrei_"},
+		},
 	}
 	filename := "testdata/2019-09-18-1.log.gz"
 	r := textproto.NewReader(bufio.NewReader(bytes.NewReader(data)))
@@ -183,7 +177,7 @@ func TestLogLine_Parse(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		ll, err := NewLogLine(filename, players)
+		ll, err := NewLogLine(filename, whitelist)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -215,10 +209,12 @@ func TestLogLine_Parse(t *testing.T) {
 }
 
 func TestLogLine_GetDeath(t *testing.T) {
-	players := Players{
-		Player{Name: "ricky_ninja"},
-		Player{Name: "Sanrei_"},
-		Player{Name: "ChadMan9010"},
+	whitelist := &Whitelist{
+		Players: Players{
+			Player{Name: "ricky_ninja"},
+			Player{Name: "Sanrei_"},
+			Player{Name: "ChadMan9010"},
+		},
 	}
 	cases := []struct {
 		name    string
@@ -228,9 +224,9 @@ func TestLogLine_GetDeath(t *testing.T) {
 		{
 			"chat message",
 			LogLine{
-				Time:    time.Now(),
-				Line:    "<ricky_ninja> blew up your building?",
-				Players: players,
+				Time:      time.Now(),
+				Line:      "<ricky_ninja> blew up your building?",
+				whitelist: whitelist,
 			},
 			Death{
 				Type:   DeathNone,
@@ -241,9 +237,9 @@ func TestLogLine_GetDeath(t *testing.T) {
 		{
 			"death by explosion",
 			LogLine{
-				Time:    time.Now(),
-				Line:    "ricky_ninja blew up",
-				Players: players,
+				Time:      time.Now(),
+				Line:      "ricky_ninja blew up",
+				whitelist: whitelist,
 			},
 			Death{
 				Type:   DeathExplosion,
@@ -254,9 +250,9 @@ func TestLogLine_GetDeath(t *testing.T) {
 		{
 			"death by falling",
 			LogLine{
-				Time:    time.Now(),
-				Line:    "ricky_ninja fell from a high place",
-				Players: players,
+				Time:      time.Now(),
+				Line:      "ricky_ninja fell from a high place",
+				whitelist: whitelist,
 			},
 			Death{
 				Type:   DeathFall,
@@ -267,9 +263,9 @@ func TestLogLine_GetDeath(t *testing.T) {
 		{
 			"death by squishing",
 			LogLine{
-				Time:    time.Now(),
-				Line:    "Sanrei_ was squished too much",
-				Players: players,
+				Time:      time.Now(),
+				Line:      "Sanrei_ was squished too much",
+				whitelist: whitelist,
 			},
 			Death{
 				Type:   DeathSquish,
@@ -280,9 +276,9 @@ func TestLogLine_GetDeath(t *testing.T) {
 		{
 			"death by drowning",
 			LogLine{
-				Time:    time.Now(),
-				Line:    "Sanrei_ drowned",
-				Players: players,
+				Time:      time.Now(),
+				Line:      "Sanrei_ drowned",
+				whitelist: whitelist,
 			},
 			Death{
 				Type:   DeathDrown,
@@ -293,9 +289,9 @@ func TestLogLine_GetDeath(t *testing.T) {
 		{
 			"death by creeper",
 			LogLine{
-				Time:    time.Now(),
-				Line:    "ricky_ninja was blown up by Creeper",
-				Players: players,
+				Time:      time.Now(),
+				Line:      "ricky_ninja was blown up by Creeper",
+				whitelist: whitelist,
 			},
 			Death{
 				Type:   DeathExplosion,
@@ -306,9 +302,9 @@ func TestLogLine_GetDeath(t *testing.T) {
 		{
 			"burnt by ghast",
 			LogLine{
-				Time:    time.Now(),
-				Line:    "ChadMan9010 was burnt to a crisp whilst fighting Ghast",
-				Players: players,
+				Time:      time.Now(),
+				Line:      "ChadMan9010 was burnt to a crisp whilst fighting Ghast",
+				whitelist: whitelist,
 			},
 			Death{
 				Type:   DeathFire,
@@ -330,14 +326,6 @@ func TestLogLine_GetDeath(t *testing.T) {
 			t.Errorf("case name: [%s] wrong killer got %s want %s", tc.name, got.Killer, want.Killer)
 		}
 	}
-}
-
-func getTextReader(t *testing.T, filename string) *textproto.Reader {
-	tr, err := GetTextReader(filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tr
 }
 
 func getFileBytes(t *testing.T, filename string) []byte {
