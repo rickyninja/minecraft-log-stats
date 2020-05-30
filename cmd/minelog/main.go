@@ -14,24 +14,35 @@ import (
 	"github.com/wcharczuk/go-chart"
 )
 
-var (
-	logdir        string
-	whitelistFile string
-)
+type arg struct {
+	logdir    string
+	whitelist string
+}
 
-func init() {
-	flag.StringVar(&logdir, "logdir", "", "the directory with log files")
-	flag.StringVar(&whitelistFile, "whitelist", "", "the whitelist.json file")
+func (a *arg) Validate() error {
+	if a.logdir == "" {
+		return fmt.Errorf("logdir is required")
+	}
+	if a.whitelist == "" {
+		return fmt.Errorf("whitelist is required")
+	}
+	return nil
+}
+
+func (a *arg) Parse() {
+	flag.StringVar(&a.logdir, "logdir", "", "the directory with log files")
+	flag.StringVar(&a.whitelist, "whitelist", "", "the whitelist.json file")
+	flag.Parse()
 }
 
 func main() {
-	flag.Parse()
-	err := validateFlags()
-	if err != nil {
+	cli := new(arg)
+	cli.Parse()
+	if err := cli.Validate(); err != nil {
 		log.Fatal(err)
 	}
-	whitelist, err := minelog.LoadWhitelistFile(whitelistFile)
-	deaths, err := processLogDir(logdir, whitelist)
+	whitelist, err := minelog.LoadWhitelistFile(cli.whitelist)
+	deaths, err := processLogDir(cli.logdir, whitelist)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -148,11 +159,4 @@ func processLogDir(logdir string, whitelist *minelog.Whitelist) ([]minelog.Death
 		}
 	}
 	return deaths, nil
-}
-
-func validateFlags() error {
-	if logdir == "" {
-		return fmt.Errorf("logdir is required")
-	}
-	return nil
 }
