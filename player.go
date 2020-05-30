@@ -1,4 +1,4 @@
-package main
+package minelog
 
 type Players []Player
 

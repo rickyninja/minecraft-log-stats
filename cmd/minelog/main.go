@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rickyninja/minelog"
 	"github.com/wcharczuk/go-chart"
 )
 
@@ -32,7 +33,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	players, err := GetPlayers(whitelist)
+	players, err := minelog.GetPlayers(whitelist)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func main() {
 			deathType = make(map[string]int)
 			deathTypeByVictim[death.Victim] = deathType
 		}
-		if death.Type == DeathMob {
+		if death.Type == minelog.DeathMob {
 			deathType[death.Killer]++
 		} else {
 			deathType[death.Type.String()]++
@@ -108,8 +109,8 @@ func mostDeaths(m map[string]int) string {
 	return victim
 }
 
-func processLogDir(logdir string, players Players) ([]Death, error) {
-	deaths := make([]Death, 0)
+func processLogDir(logdir string, players minelog.Players) ([]minelog.Death, error) {
+	deaths := make([]minelog.Death, 0)
 	files, err := ioutil.ReadDir(logdir)
 	if err != nil {
 		return deaths, err
@@ -131,7 +132,7 @@ func processLogDir(logdir string, players Players) ([]Death, error) {
 				}
 				return deaths, err
 			}
-			ll, err := NewLogLine(filename, players)
+			ll, err := minelog.NewLogLine(filename, players)
 			if err != nil {
 				return deaths, err
 			}
@@ -143,10 +144,10 @@ func processLogDir(logdir string, players Players) ([]Death, error) {
 			//fmt.Println(ll.Line)
 			toks := strings.Fields(ll.Line)
 			//fmt.Printf("isplayer %s: %t\n", toks[0], ll.IsPlayer(toks[0]))
-			if death.Type == DeathNone && ll.PlayerInWhiteList(toks[0]) && !KnownEvent(line) {
+			if death.Type == minelog.DeathNone && ll.PlayerInWhiteList(toks[0]) && !KnownEvent(line) {
 				log.Printf("unrecognized death: %s", ll.Line)
 			}
-			if death.Type == DeathNone {
+			if death.Type == minelog.DeathNone {
 				continue
 			}
 			deaths = append(deaths, death)
